@@ -140,7 +140,7 @@ class JavaRefPluginTest {
             .findSpecial(interfaceClass, "value", MethodType.methodType(String.class), interfaceClass)
             .bindTo(proxy);
 
-        NoSuchMethodError defaultFailure = assertThrows(NoSuchMethodError.class, handle::invokeExact);
+        NoSuchMethodError defaultFailure = assertThrows(NoSuchMethodError.class, handle::invokeWithArguments);
         assertEquals("Method body stripped by JavaRef plugin.", defaultFailure.getMessage());
     }
 
@@ -204,14 +204,20 @@ class JavaRefPluginTest {
         return source + ":" + diagnostic.getLineNumber() + ": " + diagnostic.getMessage(null);
     }
 
-    private record CompilationResult(Path classesDirectory) {
-        private Class<?> loadClass(String name) throws Exception {
-            return Class.forName(name, true, classLoader());
+    private static final class CompilationResult {
+        private final URLClassLoader classLoader;
+
+        private CompilationResult(Path classesDirectory) throws IOException {
+            URL url = classesDirectory.toUri().toURL();
+            this.classLoader = new URLClassLoader(new URL[] { url }, JavaRefPluginTest.class.getClassLoader());
         }
 
-        private URLClassLoader classLoader() throws IOException {
-            URL url = classesDirectory.toUri().toURL();
-            return new URLClassLoader(new URL[] { url }, JavaRefPluginTest.class.getClassLoader());
+        private Class<?> loadClass(String name) throws Exception {
+            return Class.forName(name, true, classLoader);
+        }
+
+        private URLClassLoader classLoader() {
+            return classLoader;
         }
     }
 }

@@ -26,7 +26,6 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
     }
-    withJavadocJar()
     withSourcesJar()
 }
 
@@ -57,7 +56,7 @@ publishing {
             artifactId = rootProject.name
             pom {
                 name = "java-ref-plugin"
-                description = project.description
+                description = project.description.toString()
                 url = "https://github.com/ikvmnet/java-ref-plugin"
                 licenses {
                     license {
@@ -84,7 +83,7 @@ publishing {
             name = "GitHubPackages"
             val repositoryPath = providers.environmentVariable("GITHUB_REPOSITORY")
                 .orElse("ikvmnet/java-ref-plugin")
-            url = uri(repositoryPath.map { "https://maven.pkg.github.com/$it" })
+            url = uri("https://maven.pkg.github.com/${repositoryPath.get()}")
             credentials {
                 username = providers.gradleProperty("githubUsername")
                     .orElse(providers.environmentVariable("GITHUB_ACTOR"))
