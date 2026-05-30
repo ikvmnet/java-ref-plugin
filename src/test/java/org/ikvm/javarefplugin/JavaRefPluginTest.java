@@ -1,23 +1,21 @@
 package org.ikvm.javarefplugin;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -32,29 +30,33 @@ import org.junit.jupiter.api.io.TempDir;
 
 class JavaRefPluginTest {
 
+    private static final String STRIPPED_MESSAGE = "Method body stripped from reference-only artifact.";
+
     @TempDir
     Path tempDir;
 
     @Test
     void stripsStaticMethodsAndConstructorsWhileKeepingFields() throws Exception {
-        CompilationResult result = compile(
-            Map.of(
-                "example/Sample.java",
-                """
-                package example;
-
-                public class Sample {
-                    public static final String CONSTANT = "hello";
-
-                    public Sample() {
-                    }
-
-                    public static String greeting() {
-                        return CONSTANT;
-                    }
-                }
-                """
+        Map<String, String> sources = new LinkedHashMap<>();
+        sources.put(
+            "example/Sample.java",
+            joinLines(
+                "package example;",
+                "",
+                "public class Sample {",
+                "    public static final String CONSTANT = \"hello\";",
+                "",
+                "    public Sample() {",
+                "    }",
+                "",
+                "    public static String greeting() {",
+                "        return CONSTANT;",
+                "    }",
+                "}"
             )
+        );
+        CompilationResult result = compile(
+            sources
         );
 
         Class<?> sampleClass = result.loadClass("example.Sample");
@@ -64,117 +66,121 @@ class JavaRefPluginTest {
 
         InvocationTargetException staticFailure =
             assertThrows(InvocationTargetException.class, () -> sampleClass.getMethod("greeting").invoke(null));
-        UnsupportedOperationException staticCause =
-            assertInstanceOf(UnsupportedOperationException.class, staticFailure.getCause());
-        assertEquals("Method body stripped from reference-only artifact.", staticCause.getMessage());
+        assertTrue(staticFailure.getCause() instanceof UnsupportedOperationException);
+        assertEquals(STRIPPED_MESSAGE, staticFailure.getCause().getMessage());
 
         InvocationTargetException constructorFailure =
             assertThrows(InvocationTargetException.class, () -> sampleClass.getConstructor().newInstance());
-        UnsupportedOperationException constructorCause =
-            assertInstanceOf(UnsupportedOperationException.class, constructorFailure.getCause());
-        assertEquals("Method body stripped from reference-only artifact.", constructorCause.getMessage());
+        assertTrue(constructorFailure.getCause() instanceof UnsupportedOperationException);
+        assertEquals(STRIPPED_MESSAGE, constructorFailure.getCause().getMessage());
     }
 
     @Test
     void keepsExplicitConstructorChainingValid() throws Exception {
-        CompilationResult result = compile(
-            Map.of(
-                "example/Base.java",
-                """
-                package example;
-
-                public class Base {
-                    public Base(String name) {
-                    }
-                }
-                """,
-                "example/Child.java",
-                """
-                package example;
-
-                public class Child extends Base {
-                    public Child() {
-                        super("parent");
-                    }
-                }
-                """
+        Map<String, String> sources = new LinkedHashMap<>();
+        sources.put(
+            "example/Base.java",
+            joinLines(
+                "package example;",
+                "",
+                "public class Base {",
+                "    public Base(String name) {",
+                "    }",
+                "}"
             )
+        );
+        sources.put(
+            "example/Child.java",
+            joinLines(
+                "package example;",
+                "",
+                "public class Child extends Base {",
+                "    public Child() {",
+                "        super(\"parent\");",
+                "    }",
+                "}"
+            )
+        );
+        CompilationResult result = compile(
+            sources
         );
 
         Class<?> childClass = result.loadClass("example.Child");
         InvocationTargetException constructorFailure =
             assertThrows(InvocationTargetException.class, () -> childClass.getConstructor().newInstance());
-        UnsupportedOperationException constructorCause =
-            assertInstanceOf(UnsupportedOperationException.class, constructorFailure.getCause());
-        assertEquals("Method body stripped from reference-only artifact.", constructorCause.getMessage());
+        assertTrue(constructorFailure.getCause() instanceof UnsupportedOperationException);
+        assertEquals(STRIPPED_MESSAGE, constructorFailure.getCause().getMessage());
     }
 
     @Test
     void stripsInterfaceDefaultAndStaticMethods() throws Exception {
-        CompilationResult result = compile(
-            Map.of(
-                "example/SampleInterface.java",
-                """
-                package example;
-
-                public interface SampleInterface {
-                    default String value() {
-                        return "value";
-                    }
-
-                    static String helper() {
-                        return "helper";
-                    }
-                }
-                """
+        Map<String, String> sources = new LinkedHashMap<>();
+        sources.put(
+            "example/SampleInterface.java",
+            joinLines(
+                "package example;",
+                "",
+                "public interface SampleInterface {",
+                "    default String value() {",
+                "        return \"value\";",
+                "    }",
+                "",
+                "    static String helper() {",
+                "        return \"helper\";",
+                "    }",
+                "}"
             )
+        );
+        sources.put(
+            "example/SampleInterfaceImpl.java",
+            joinLines(
+                "package example;",
+                "",
+                "public class SampleInterfaceImpl implements SampleInterface {",
+                "}"
+            )
+        );
+        CompilationResult result = compile(
+            sources
         );
 
         Class<?> interfaceClass = result.loadClass("example.SampleInterface");
+        Class<?> implementationClass = result.loadClass("example.SampleInterfaceImpl");
 
         InvocationTargetException staticFailure =
             assertThrows(InvocationTargetException.class, () -> interfaceClass.getMethod("helper").invoke(null));
-        UnsupportedOperationException staticCause =
-            assertInstanceOf(UnsupportedOperationException.class, staticFailure.getCause());
-        assertEquals("Method body stripped from reference-only artifact.", staticCause.getMessage());
+        assertTrue(staticFailure.getCause() instanceof UnsupportedOperationException);
+        assertEquals(STRIPPED_MESSAGE, staticFailure.getCause().getMessage());
 
-        Object proxy = java.lang.reflect.Proxy.newProxyInstance(
-            result.classLoader(),
-            new Class<?>[] { interfaceClass },
-            (instance, method, arguments) -> {
-                throw new UnsupportedOperationException(method.getName());
-            }
-        );
-
-        MethodHandle handle = MethodHandles.privateLookupIn(interfaceClass, MethodHandles.lookup())
-            .findSpecial(interfaceClass, "value", MethodType.methodType(String.class), interfaceClass)
-            .bindTo(proxy);
-
-        UnsupportedOperationException defaultFailure =
-            assertThrows(UnsupportedOperationException.class, handle::invokeWithArguments);
-        assertEquals("Method body stripped from reference-only artifact.", defaultFailure.getMessage());
+        Object instance = implementationClass.getConstructor().newInstance();
+        Method defaultMethod = implementationClass.getMethod("value");
+        InvocationTargetException defaultFailure =
+            assertThrows(InvocationTargetException.class, () -> defaultMethod.invoke(instance));
+        assertTrue(defaultFailure.getCause() instanceof UnsupportedOperationException);
+        assertEquals(STRIPPED_MESSAGE, defaultFailure.getCause().getMessage());
     }
 
     @Test
     void stripsImplicitDefaultConstructors() throws Exception {
-        CompilationResult result = compile(
-            Map.of(
-                "example/ImplicitConstructor.java",
-                """
-                package example;
-
-                public class ImplicitConstructor {
-                }
-                """
+        Map<String, String> sources = new LinkedHashMap<>();
+        sources.put(
+            "example/ImplicitConstructor.java",
+            joinLines(
+                "package example;",
+                "",
+                "public class ImplicitConstructor {",
+                "}"
             )
+        );
+        CompilationResult result = compile(
+            sources
         );
 
         Class<?> type = result.loadClass("example.ImplicitConstructor");
         InvocationTargetException constructorFailure =
             assertThrows(InvocationTargetException.class, () -> type.getConstructor().newInstance());
-        UnsupportedOperationException constructorCause =
-            assertInstanceOf(UnsupportedOperationException.class, constructorFailure.getCause());
-        assertEquals("Method body stripped from reference-only artifact.", constructorCause.getMessage());
+        assertTrue(constructorFailure.getCause() instanceof UnsupportedOperationException);
+        assertEquals(STRIPPED_MESSAGE, constructorFailure.getCause().getMessage());
     }
 
     @Test
@@ -199,14 +205,13 @@ class JavaRefPluginTest {
 
         try (StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnostics, null, StandardCharsets.UTF_8)) {
             Iterable<? extends JavaFileObject> units = fileManager.getJavaFileObjectsFromFiles(sourceFiles);
-            List<String> options = List.of(
-                "-proc:none",
-                "-classpath",
-                System.getProperty("java.class.path"),
-                "-d",
-                classesDirectory.toString(),
-                "-Xplugin:" + JavaRefPlugin.NAME
-            );
+            List<String> options = new ArrayList<String>();
+            options.add("-proc:none");
+            options.add("-classpath");
+            options.add(System.getProperty("java.class.path"));
+            options.add("-d");
+            options.add(classesDirectory.toString());
+            options.add("-Xplugin:" + JavaRefPlugin.NAME);
             Boolean success = compiler.getTask(null, fileManager, diagnostics, options, null, units).call();
 
             assertTrue(Boolean.TRUE.equals(success), () -> diagnostics.getDiagnostics()
@@ -221,6 +226,10 @@ class JavaRefPluginTest {
     private static String formatDiagnostic(Diagnostic<? extends JavaFileObject> diagnostic) {
         String source = diagnostic.getSource() == null ? "<unknown>" : diagnostic.getSource().getName();
         return source + ":" + diagnostic.getLineNumber() + ": " + diagnostic.getMessage(null);
+    }
+
+    private static String joinLines(String... lines) {
+        return String.join(System.lineSeparator(), lines) + System.lineSeparator();
     }
 
     private static int classFileMajorVersion(Class<?> type) throws IOException {

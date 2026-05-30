@@ -10,14 +10,11 @@ repositories {
     mavenCentral()
 }
 
-val javacExports = listOf(
-    "jdk.compiler/com.sun.tools.javac.api",
-    "jdk.compiler/com.sun.tools.javac.code",
-    "jdk.compiler/com.sun.tools.javac.tree",
-    "jdk.compiler/com.sun.tools.javac.util",
-)
-
 val java8Compiler = javaToolchains.compilerFor {
+    languageVersion = JavaLanguageVersion.of(8)
+}
+
+val java8Launcher = javaToolchains.launcherFor {
     languageVersion = JavaLanguageVersion.of(8)
 }
 
@@ -41,13 +38,14 @@ tasks.named<JavaCompile>("compileJava") {
 }
 
 tasks.named<JavaCompile>("compileTestJava") {
-    sourceCompatibility = JavaVersion.VERSION_17.toString()
-    targetCompatibility = JavaVersion.VERSION_17.toString()
+    javaCompiler = java8Compiler
+    sourceCompatibility = JavaVersion.VERSION_1_8.toString()
+    targetCompatibility = JavaVersion.VERSION_1_8.toString()
 }
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
-    jvmArgs(javacExports.map { export -> "--add-exports=$export=ALL-UNNAMED" })
+    javaLauncher = java8Launcher
     testLogging {
         exceptionFormat = TestExceptionFormat.FULL
     }
