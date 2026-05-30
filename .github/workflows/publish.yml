@@ -25,7 +25,17 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Publish to GitHub Packages
+      - name: Publish release to GitHub Packages
+        if: github.event_name == 'release'
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ORG_GRADLE_PROJECT_version: ${{ github.event.release.tag_name }}
+        run: ./gradlew publish
+
+      - name: Publish workflow dispatch to GitHub Packages
+        if: github.event_name == 'workflow_dispatch'
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
