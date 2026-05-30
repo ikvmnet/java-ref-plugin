@@ -19,7 +19,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     outputs:
-      gradle_version: ${{ steps.gitversion.outputs.fullSemVer }}
+      gradle_version: ${{ steps.maven_version.outputs.value }}
     permissions:
       contents: read
     steps:
@@ -38,6 +38,25 @@ jobs:
         id: gitversion
         uses: gittools/actions/gitversion/execute@v4
 
+      - name: Compute Maven-friendly version
+        id: maven_version
+        shell: bash
+        env:
+          GITVERSION_MAJOR_MINOR_PATCH: ${{ steps.gitversion.outputs.majorMinorPatch }}
+          GITVERSION_PRE_RELEASE_LABEL: ${{ steps.gitversion.outputs.preReleaseLabel }}
+          GITVERSION_PRE_RELEASE_NUMBER: ${{ steps.gitversion.outputs.preReleaseNumber }}
+        run: |
+          version="$GITVERSION_MAJOR_MINOR_PATCH"
+          if [ -n "$GITVERSION_PRE_RELEASE_LABEL" ]; then
+            version="$version-$GITVERSION_PRE_RELEASE_LABEL"
+            if [ -n "$GITVERSION_PRE_RELEASE_NUMBER" ]; then
+              version="$version-$GITVERSION_PRE_RELEASE_NUMBER"
+            fi
+          fi
+
+          echo "Computed Maven version: $version"
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
@@ -49,7 +68,7 @@ jobs:
 
       - name: Build and test
         env:
-          ORG_GRADLE_PROJECT_version: ${{ steps.gitversion.outputs.fullSemVer }}
+          ORG_GRADLE_PROJECT_version: ${{ steps.maven_version.outputs.value }}
         run: ./gradlew build
 
       - name: Upload Gradle build output
