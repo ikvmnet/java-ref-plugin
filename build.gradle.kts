@@ -30,11 +30,11 @@ java {
 }
 
 tasks.named<JavaCompile>("compileJava") {
+    javaCompiler = javaToolchains.compilerFor {
+        languageVersion = JavaLanguageVersion.of(8)
+    }
     sourceCompatibility = JavaVersion.VERSION_1_8.toString()
     targetCompatibility = JavaVersion.VERSION_1_8.toString()
-    options.compilerArgs.addAll(
-        javacExports.flatMap { export -> listOf("--add-exports", "$export=ALL-UNNAMED") },
-    )
 }
 
 tasks.named<JavaCompile>("compileTestJava") {
