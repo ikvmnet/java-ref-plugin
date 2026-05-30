@@ -23,6 +23,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          submodules: recursive
 
       - name: Install GitVersion
         uses: gittools/actions/gitversion/setup@v4
