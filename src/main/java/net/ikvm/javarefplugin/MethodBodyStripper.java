@@ -93,12 +93,19 @@ final class MethodBodyStripper extends TreeTranslator {
         }
 
         JCTree.JCStatement first = statements.head;
-        if (first instanceof JCTree.JCExpressionStatement expressionStatement
-            && expressionStatement.expr instanceof JCTree.JCMethodInvocation invocation) {
+        if (first instanceof JCTree.JCExpressionStatement) {
+            JCTree.JCExpressionStatement expressionStatement = (JCTree.JCExpressionStatement) first;
+            if (!(expressionStatement.expr instanceof JCTree.JCMethodInvocation)) {
+                return null;
+            }
+
+            JCTree.JCMethodInvocation invocation = (JCTree.JCMethodInvocation) expressionStatement.expr;
             Name invokedName = null;
-            if (invocation.meth instanceof JCTree.JCIdent ident) {
+            if (invocation.meth instanceof JCTree.JCIdent) {
+                JCTree.JCIdent ident = (JCTree.JCIdent) invocation.meth;
                 invokedName = ident.name;
-            } else if (invocation.meth instanceof JCTree.JCFieldAccess fieldAccess) {
+            } else if (invocation.meth instanceof JCTree.JCFieldAccess) {
+                JCTree.JCFieldAccess fieldAccess = (JCTree.JCFieldAccess) invocation.meth;
                 invokedName = fieldAccess.name;
             }
 

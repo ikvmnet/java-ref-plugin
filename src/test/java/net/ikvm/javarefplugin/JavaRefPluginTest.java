@@ -15,6 +15,7 @@ import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -164,6 +165,12 @@ class JavaRefPluginTest {
         assertTrue(constructorFailure.getCause() instanceof NoSuchMethodError);
     }
 
+    @Test
+    void pluginClassesTargetJava8Bytecode() throws Exception {
+        assertEquals(52, classFileMajorVersion(JavaRefPlugin.class));
+        assertEquals(52, classFileMajorVersion(MethodBodyStripper.class));
+    }
+
     private CompilationResult compile(Map<String, String> sources) throws IOException {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
@@ -202,6 +209,24 @@ class JavaRefPluginTest {
     private static String formatDiagnostic(Diagnostic<? extends JavaFileObject> diagnostic) {
         String source = diagnostic.getSource() == null ? "<unknown>" : diagnostic.getSource().getName();
         return source + ":" + diagnostic.getLineNumber() + ": " + diagnostic.getMessage(null);
+    }
+
+    private static int classFileMajorVersion(Class<?> type) throws IOException {
+        try (InputStream input = type.getResourceAsStream(type.getSimpleName() + ".class")) {
+            assertNotNull(input);
+
+            byte[] header = new byte[8];
+            int offset = 0;
+            while (offset < header.length) {
+                int read = input.read(header, offset, header.length - offset);
+                if (read < 0) {
+                    throw new IOException("Unexpected end of class file for " + type.getName());
+                }
+                offset += read;
+            }
+
+            return ((header[6] & 0xff) << 8) | (header[7] & 0xff);
+        }
     }
 
     private static final class CompilationResult {

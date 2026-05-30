@@ -29,10 +29,17 @@ java {
     withSourcesJar()
 }
 
-tasks.withType<JavaCompile>().configureEach {
+tasks.named<JavaCompile>("compileJava") {
+    sourceCompatibility = JavaVersion.VERSION_1_8.toString()
+    targetCompatibility = JavaVersion.VERSION_1_8.toString()
     options.compilerArgs.addAll(
         javacExports.flatMap { export -> listOf("--add-exports", "$export=ALL-UNNAMED") },
     )
+}
+
+tasks.named<JavaCompile>("compileTestJava") {
+    sourceCompatibility = JavaVersion.VERSION_17.toString()
+    targetCompatibility = JavaVersion.VERSION_17.toString()
 }
 
 tasks.withType<Test>().configureEach {
