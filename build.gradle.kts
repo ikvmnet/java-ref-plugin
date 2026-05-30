@@ -55,7 +55,7 @@ tasks.withType<Test>().configureEach {
 
 tasks.named<Jar>("jar") {
     manifest {
-        attributes["Automatic-Module-Name"] = "net.ikvm.javarefplugin"
+        attributes["Automatic-Module-Name"] = "org.ikvm.javarefplugin"
     }
 }
 

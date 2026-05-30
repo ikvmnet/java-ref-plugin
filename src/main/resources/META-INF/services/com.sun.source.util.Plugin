@@ -1,1 +1,1 @@
-net.ikvm.javarefplugin.JavaRefPlugin
+org.ikvm.javarefplugin.JavaRefPlugin

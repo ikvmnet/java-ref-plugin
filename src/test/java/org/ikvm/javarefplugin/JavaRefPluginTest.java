@@ -1,4 +1,4 @@
-package net.ikvm.javarefplugin;
+package org.ikvm.javarefplugin;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -246,3 +246,4 @@ class JavaRefPluginTest {
         }
     }
 }
+

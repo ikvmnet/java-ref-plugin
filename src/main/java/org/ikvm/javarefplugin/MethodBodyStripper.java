@@ -1,4 +1,4 @@
-package net.ikvm.javarefplugin;
+package org.ikvm.javarefplugin;
 
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.tree.JCTree;
@@ -126,3 +126,4 @@ final class MethodBodyStripper extends TreeTranslator {
         return expression;
     }
 }
+

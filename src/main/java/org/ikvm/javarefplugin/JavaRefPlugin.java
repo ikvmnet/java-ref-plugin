@@ -1,4 +1,4 @@
-package net.ikvm.javarefplugin;
+package org.ikvm.javarefplugin;
 
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.Plugin;
@@ -44,3 +44,4 @@ public final class JavaRefPlugin implements Plugin {
         });
     }
 }
+
