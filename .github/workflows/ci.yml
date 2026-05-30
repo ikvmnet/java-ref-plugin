@@ -66,6 +66,14 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v4
+        with:
+          versionSpec: 6.x
+
+      - name: Execute GitVersion
+        uses: gittools/actions/gitversion/execute@v4
+
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
