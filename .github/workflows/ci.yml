@@ -71,6 +71,20 @@ jobs:
           ORG_GRADLE_PROJECT_version: ${{ steps.maven_version.outputs.value }}
         run: ./gradlew build
 
+      - name: Upload library JAR
+        uses: actions/upload-artifact@v7
+        with:
+          name: java-ref-plugin-${{ steps.maven_version.outputs.value }}
+          path: build/libs/java-ref-plugin-${{ steps.maven_version.outputs.value }}.jar
+          if-no-files-found: error
+
+      - name: Upload sources JAR
+        uses: actions/upload-artifact@v7
+        with:
+          name: java-ref-plugin-${{ steps.maven_version.outputs.value }}-sources
+          path: build/libs/java-ref-plugin-${{ steps.maven_version.outputs.value }}-sources.jar
+          if-no-files-found: error
+
       - name: Upload Gradle build output
         uses: actions/upload-artifact@v7
         with:
@@ -102,7 +116,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Download Gradle build output
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: gradle-build-output
           path: build/
