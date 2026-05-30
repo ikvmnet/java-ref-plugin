@@ -17,7 +17,12 @@ val javacExports = listOf(
     "jdk.compiler/com.sun.tools.javac.util",
 )
 
+val java8Compiler = javaToolchains.compilerFor {
+    languageVersion = JavaLanguageVersion.of(8)
+}
+
 dependencies {
+    compileOnly(files(java8Compiler.map { it.metadata.installationPath.file("lib/tools.jar") }))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
@@ -30,9 +35,7 @@ java {
 }
 
 tasks.named<JavaCompile>("compileJava") {
-    javaCompiler = javaToolchains.compilerFor {
-        languageVersion = JavaLanguageVersion.of(8)
-    }
+    javaCompiler = java8Compiler
     sourceCompatibility = JavaVersion.VERSION_1_8.toString()
     targetCompatibility = JavaVersion.VERSION_1_8.toString()
 }
