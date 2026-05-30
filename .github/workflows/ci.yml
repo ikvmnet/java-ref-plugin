@@ -57,6 +57,7 @@ jobs:
         with:
           name: gradle-build-output
           path: build/
+          if-no-files-found: error
 
   publish:
     name: Publish
@@ -85,7 +86,16 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: gradle-build-output
-          path: .
+          path: build/
+
+      - name: Verify restored Gradle build output
+        env:
+          ORG_GRADLE_PROJECT_version: ${{ needs.build.outputs.gradle_version }}
+        run: |
+          find build -maxdepth 3 -type f | sort
+          test -d build/libs
+          test -f "build/libs/java-ref-plugin-${ORG_GRADLE_PROJECT_version}.jar"
+          test -f "build/libs/java-ref-plugin-${ORG_GRADLE_PROJECT_version}-sources.jar"
 
       - name: Publish release to GitHub Packages
         env:
