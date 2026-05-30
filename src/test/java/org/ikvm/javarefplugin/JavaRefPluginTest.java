@@ -1,6 +1,7 @@
 package org.ikvm.javarefplugin;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -63,11 +64,15 @@ class JavaRefPluginTest {
 
         InvocationTargetException staticFailure =
             assertThrows(InvocationTargetException.class, () -> sampleClass.getMethod("greeting").invoke(null));
-        assertTrue(staticFailure.getCause() instanceof NoSuchMethodError);
+        UnsupportedOperationException staticCause =
+            assertInstanceOf(UnsupportedOperationException.class, staticFailure.getCause());
+        assertEquals("Method body stripped from reference-only artifact.", staticCause.getMessage());
 
         InvocationTargetException constructorFailure =
             assertThrows(InvocationTargetException.class, () -> sampleClass.getConstructor().newInstance());
-        assertTrue(constructorFailure.getCause() instanceof NoSuchMethodError);
+        UnsupportedOperationException constructorCause =
+            assertInstanceOf(UnsupportedOperationException.class, constructorFailure.getCause());
+        assertEquals("Method body stripped from reference-only artifact.", constructorCause.getMessage());
     }
 
     @Test
@@ -99,7 +104,9 @@ class JavaRefPluginTest {
         Class<?> childClass = result.loadClass("example.Child");
         InvocationTargetException constructorFailure =
             assertThrows(InvocationTargetException.class, () -> childClass.getConstructor().newInstance());
-        assertTrue(constructorFailure.getCause() instanceof NoSuchMethodError);
+        UnsupportedOperationException constructorCause =
+            assertInstanceOf(UnsupportedOperationException.class, constructorFailure.getCause());
+        assertEquals("Method body stripped from reference-only artifact.", constructorCause.getMessage());
     }
 
     @Test
@@ -127,7 +134,9 @@ class JavaRefPluginTest {
 
         InvocationTargetException staticFailure =
             assertThrows(InvocationTargetException.class, () -> interfaceClass.getMethod("helper").invoke(null));
-        assertTrue(staticFailure.getCause() instanceof NoSuchMethodError);
+        UnsupportedOperationException staticCause =
+            assertInstanceOf(UnsupportedOperationException.class, staticFailure.getCause());
+        assertEquals("Method body stripped from reference-only artifact.", staticCause.getMessage());
 
         Object proxy = java.lang.reflect.Proxy.newProxyInstance(
             result.classLoader(),
@@ -141,8 +150,9 @@ class JavaRefPluginTest {
             .findSpecial(interfaceClass, "value", MethodType.methodType(String.class), interfaceClass)
             .bindTo(proxy);
 
-        NoSuchMethodError defaultFailure = assertThrows(NoSuchMethodError.class, handle::invokeWithArguments);
-        assertEquals("Method body stripped by JavaRef plugin.", defaultFailure.getMessage());
+        UnsupportedOperationException defaultFailure =
+            assertThrows(UnsupportedOperationException.class, handle::invokeWithArguments);
+        assertEquals("Method body stripped from reference-only artifact.", defaultFailure.getMessage());
     }
 
     @Test
@@ -162,7 +172,9 @@ class JavaRefPluginTest {
         Class<?> type = result.loadClass("example.ImplicitConstructor");
         InvocationTargetException constructorFailure =
             assertThrows(InvocationTargetException.class, () -> type.getConstructor().newInstance());
-        assertTrue(constructorFailure.getCause() instanceof NoSuchMethodError);
+        UnsupportedOperationException constructorCause =
+            assertInstanceOf(UnsupportedOperationException.class, constructorFailure.getCause());
+        assertEquals("Method body stripped from reference-only artifact.", constructorCause.getMessage());
     }
 
     @Test

@@ -12,7 +12,7 @@ import com.sun.tools.javac.util.Names;
 
 final class MethodBodyStripper extends TreeTranslator {
 
-    private static final String STRIPPED_MESSAGE = "Method body stripped by JavaRef plugin.";
+    private static final String STRIPPED_MESSAGE = "Method body stripped from reference-only artifact.";
 
     private final TreeMaker maker;
     private final Names names;
@@ -77,7 +77,7 @@ final class MethodBodyStripper extends TreeTranslator {
                 maker.NewClass(
                     null,
                     List.nil(),
-                    memberAccess("java.lang.NoSuchMethodError"),
+                    unsupportedOperationExceptionType(),
                     List.of(maker.Literal(STRIPPED_MESSAGE)),
                     null
                 )
@@ -117,8 +117,8 @@ final class MethodBodyStripper extends TreeTranslator {
         return null;
     }
 
-    private JCTree.JCExpression memberAccess(String qualifiedName) {
-        String[] elements = qualifiedName.split("\\.");
+    private JCTree.JCExpression unsupportedOperationExceptionType() {
+        String[] elements = "java.lang.UnsupportedOperationException".split("\\.");
         JCTree.JCExpression expression = maker.Ident(names.fromString(elements[0]));
         for (int i = 1; i < elements.length; i++) {
             expression = maker.Select(expression, names.fromString(elements[i]));
