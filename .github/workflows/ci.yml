@@ -24,7 +24,7 @@ jobs:
       contents: read
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: recursive
@@ -72,7 +72,7 @@ jobs:
         run: ./gradlew build
 
       - name: Upload Gradle build output
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: gradle-build-output
           path: build/
@@ -87,7 +87,7 @@ jobs:
       packages: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: recursive
@@ -102,7 +102,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Download Gradle build output
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: gradle-build-output
           path: build/
