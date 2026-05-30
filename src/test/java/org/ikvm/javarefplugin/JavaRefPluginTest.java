@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
@@ -114,8 +115,9 @@ class JavaRefPluginTest {
 
     @Test
     void stripsInterfaceDefaultAndStaticMethods() throws Exception {
-        Map<String, String> sources = new LinkedHashMap<>();
-        sources.put(
+        // Compile interface WITH plugin → static and default method bodies stripped
+        Map<String, String> interfaceSources = new LinkedHashMap<>();
+        interfaceSources.put(
             "example/SampleInterface.java",
             joinLines(
                 "package example;",
@@ -131,7 +133,11 @@ class JavaRefPluginTest {
                 "}"
             )
         );
-        sources.put(
+        CompilationResult interfaceResult = compileImpl(interfaceSources, "", true);
+
+        // Compile implementation WITHOUT plugin so its constructor is usable
+        Map<String, String> implSources = new LinkedHashMap<>();
+        implSources.put(
             "example/SampleInterfaceImpl.java",
             joinLines(
                 "package example;",
@@ -140,18 +146,25 @@ class JavaRefPluginTest {
                 "}"
             )
         );
-        CompilationResult result = compile(
-            sources
-        );
+        CompilationResult implResult = compileImpl(implSources, interfaceResult.classesDirectory.toString(), false);
 
-        Class<?> interfaceClass = result.loadClass("example.SampleInterface");
-        Class<?> implementationClass = result.loadClass("example.SampleInterfaceImpl");
+        // Load both sets of classes together
+        URL[] urls = new URL[] {
+            interfaceResult.classesDirectory.toUri().toURL(),
+            implResult.classesDirectory.toUri().toURL()
+        };
+        URLClassLoader classLoader = new URLClassLoader(urls, JavaRefPluginTest.class.getClassLoader());
 
+        Class<?> interfaceClass = Class.forName("example.SampleInterface", true, classLoader);
+        Class<?> implementationClass = Class.forName("example.SampleInterfaceImpl", true, classLoader);
+
+        // Static method should throw
         InvocationTargetException staticFailure =
             assertThrows(InvocationTargetException.class, () -> interfaceClass.getMethod("helper").invoke(null));
         assertTrue(staticFailure.getCause() instanceof UnsupportedOperationException);
         assertEquals(STRIPPED_MESSAGE, staticFailure.getCause().getMessage());
 
+        // Default method should throw (dispatches to stripped default from the interface)
         Object instance = implementationClass.getConstructor().newInstance();
         Method defaultMethod = implementationClass.getMethod("value");
         InvocationTargetException defaultFailure =
@@ -190,17 +203,26 @@ class JavaRefPluginTest {
     }
 
     private CompilationResult compile(Map<String, String> sources) throws IOException {
+        return compileImpl(sources, "", true);
+    }
+
+    private CompilationResult compileImpl(Map<String, String> sources, String extraClasspath, boolean withPlugin) throws IOException {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
-        Path sourceDirectory = Files.createDirectories(tempDir.resolve("src"));
-        Path classesDirectory = Files.createDirectories(tempDir.resolve("classes"));
+        Path sourceDirectory = Files.createDirectories(tempDir.resolve("src-" + System.nanoTime()));
+        Path classesDirectory = Files.createDirectories(tempDir.resolve("classes-" + System.nanoTime()));
         List<java.io.File> sourceFiles = new ArrayList<>();
 
         for (Map.Entry<String, String> source : sources.entrySet()) {
             Path file = sourceDirectory.resolve(source.getKey());
             Files.createDirectories(file.getParent());
-            Files.writeString(file, source.getValue(), StandardCharsets.UTF_8);
+            Files.write(file, source.getValue().getBytes(StandardCharsets.UTF_8));
             sourceFiles.add(file.toFile());
+        }
+
+        String classpath = System.getProperty("java.class.path");
+        if (extraClasspath != null && !extraClasspath.isEmpty()) {
+            classpath = classpath + File.pathSeparator + extraClasspath;
         }
 
         try (StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnostics, null, StandardCharsets.UTF_8)) {
@@ -208,10 +230,12 @@ class JavaRefPluginTest {
             List<String> options = new ArrayList<String>();
             options.add("-proc:none");
             options.add("-classpath");
-            options.add(System.getProperty("java.class.path"));
+            options.add(classpath);
             options.add("-d");
             options.add(classesDirectory.toString());
-            options.add("-Xplugin:" + JavaRefPlugin.NAME);
+            if (withPlugin) {
+                options.add("-Xplugin:" + JavaRefPlugin.NAME);
+            }
             Boolean success = compiler.getTask(null, fileManager, diagnostics, options, null, units).call();
 
             assertTrue(Boolean.TRUE.equals(success), () -> diagnostics.getDiagnostics()
@@ -251,19 +275,17 @@ class JavaRefPluginTest {
     }
 
     private static final class CompilationResult {
+        private final Path classesDirectory;
         private final URLClassLoader classLoader;
 
         private CompilationResult(Path classesDirectory) throws IOException {
+            this.classesDirectory = classesDirectory;
             URL url = classesDirectory.toUri().toURL();
             this.classLoader = new URLClassLoader(new URL[] { url }, JavaRefPluginTest.class.getClassLoader());
         }
 
         private Class<?> loadClass(String name) throws Exception {
             return Class.forName(name, true, classLoader);
-        }
-
-        private URLClassLoader classLoader() {
-            return classLoader;
         }
     }
 }

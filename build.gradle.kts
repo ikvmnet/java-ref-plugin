@@ -14,19 +14,19 @@ val java8Compiler = javaToolchains.compilerFor {
     languageVersion = JavaLanguageVersion.of(8)
 }
 
-val java8Launcher = javaToolchains.launcherFor {
-    languageVersion = JavaLanguageVersion.of(8)
-}
+val java8ToolsJar = files(java8Compiler.map { it.metadata.installationPath.file("lib/tools.jar") })
 
 dependencies {
-    compileOnly(files(java8Compiler.map { it.metadata.installationPath.file("lib/tools.jar") }))
+    compileOnly(java8ToolsJar)
+    testCompileOnly(java8ToolsJar)
+    testRuntimeOnly(java8ToolsJar)
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(8)
     }
     withSourcesJar()
 }
@@ -45,7 +45,6 @@ tasks.named<JavaCompile>("compileTestJava") {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
-    javaLauncher = java8Launcher
     testLogging {
         exceptionFormat = TestExceptionFormat.FULL
     }
