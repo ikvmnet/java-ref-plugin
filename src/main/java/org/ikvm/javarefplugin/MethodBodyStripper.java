@@ -30,9 +30,65 @@ final class MethodBodyStripper extends TreeTranslator {
     public void visitClassDef(JCTree.JCClassDecl tree) {
         boolean previousInAnnotationType = inAnnotationType;
         inAnnotationType = (tree.mods.flags & Flags.ANNOTATION) != 0;
+
         super.visitClassDef(tree);
+
+        // Rewrite static initializers to set fields to default values
+        if (tree.defs != null && !inAnnotationType) {
+            for (JCTree def : tree.defs) {
+                if (def instanceof JCTree.JCBlock) {
+                    JCTree.JCBlock block = (JCTree.JCBlock) def;
+                    if ((block.flags & Flags.STATIC) != 0) {
+                        // Replace with minimal field assignments
+                        block.stats = generateDefaultFieldAssignments(tree);
+                    }
+                }
+            }
+        }
+
         inAnnotationType = previousInAnnotationType;
         result = tree;
+    }
+
+    private List<JCTree.JCStatement> generateDefaultFieldAssignments(JCTree.JCClassDecl classTree) {
+        ListBuffer<JCTree.JCStatement> statements = new ListBuffer<>();
+
+        if (classTree.defs == null) {
+            return statements.toList();
+        }
+
+        // Collect all static fields
+        for (JCTree def : classTree.defs) {
+            if (def instanceof JCTree.JCVariableDecl) {
+                JCTree.JCVariableDecl varDecl = (JCTree.JCVariableDecl) def;
+                if ((varDecl.mods.flags & Flags.STATIC) != 0) {
+                    // Generate assignment: field = defaultValue;
+                    JCTree.JCExpression defaultValue = generateDefaultValue(varDecl.vartype);
+                    JCTree.JCAssign assignment = maker.Assign(
+                        maker.Ident(varDecl.name),
+                        defaultValue
+                    );
+                    statements.append(maker.Exec(assignment));
+                }
+            }
+        }
+
+        return statements.toList();
+    }
+
+    private JCTree.JCExpression generateDefaultValue(JCTree.JCExpression typeExpr) {
+        // For simplicity: 0 for numeric types, false for boolean, null for everything else
+        String typeStr = typeExpr.toString();
+        if ("int".equals(typeStr) || "byte".equals(typeStr) || "short".equals(typeStr) || "long".equals(typeStr)
+            || "float".equals(typeStr) || "double".equals(typeStr)) {
+            return maker.Literal(TypeTag.INT, 0);
+        } else if ("boolean".equals(typeStr)) {
+            return maker.Literal(TypeTag.BOOLEAN, Boolean.FALSE);
+        } else if ("char".equals(typeStr)) {
+            return maker.Literal(TypeTag.CHAR, 0);
+        }
+        // Reference type or unknown: null
+        return maker.Literal(TypeTag.BOT, null);
     }
 
     @Override
@@ -55,6 +111,10 @@ final class MethodBodyStripper extends TreeTranslator {
 
     private boolean isConstructor(JCTree.JCMethodDecl tree) {
         return tree.name == names.init;
+    }
+
+    private boolean isClassInitializer(JCTree.JCMethodDecl tree) {
+        return tree.name == names.clinit;
     }
 
 
@@ -106,4 +166,3 @@ final class MethodBodyStripper extends TreeTranslator {
     }
 
 }
-
