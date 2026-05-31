@@ -40,7 +40,7 @@ final class MethodBodyStripper extends TreeTranslator {
                     JCTree.JCBlock block = (JCTree.JCBlock) def;
                     if ((block.flags & Flags.STATIC) != 0) {
                         // Replace with minimal field assignments
-                        block.stats = generateDefaultFieldAssignments(tree);
+                        block.stats = generateDefaultStaticFieldAssignments(tree);
                     }
                 }
             }
@@ -50,7 +50,7 @@ final class MethodBodyStripper extends TreeTranslator {
         result = tree;
     }
 
-    private List<JCTree.JCStatement> generateDefaultFieldAssignments(JCTree.JCClassDecl classTree) {
+    private List<JCTree.JCStatement> generateDefaultStaticFieldAssignments(JCTree.JCClassDecl classTree) {
         ListBuffer<JCTree.JCStatement> statements = new ListBuffer<>();
 
         if (classTree.defs == null) {
@@ -65,6 +65,12 @@ final class MethodBodyStripper extends TreeTranslator {
             if (def instanceof JCTree.JCVariableDecl) {
                 JCTree.JCVariableDecl varDecl = (JCTree.JCVariableDecl) def;
                 boolean isStatic = (varDecl.mods.flags & Flags.STATIC) != 0;
+
+                // Only process static fields
+                if (!isStatic) {
+                    continue;
+                }
+
                 boolean isFinal = (varDecl.mods.flags & Flags.FINAL) != 0;
                 boolean hasInitializer = varDecl.init != null;
 
@@ -74,14 +80,12 @@ final class MethodBodyStripper extends TreeTranslator {
                 }
 
                 // Assign all other static fields
-                if (isStatic) {
-                    JCTree.JCExpression defaultValue = generateDefaultValue(varDecl.vartype);
-                    JCTree.JCAssign assignment = maker.Assign(
-                        maker.Ident(varDecl.name),
-                        defaultValue
-                    );
-                    statements.append(maker.Exec(assignment));
-                }
+                JCTree.JCExpression defaultValue = generateDefaultValue(varDecl.vartype);
+                JCTree.JCAssign assignment = maker.Assign(
+                    maker.Ident(varDecl.name),
+                    defaultValue
+                );
+                statements.append(maker.Exec(assignment));
             }
         }
 
