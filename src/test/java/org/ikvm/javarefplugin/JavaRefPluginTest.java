@@ -544,9 +544,9 @@ class JavaRefPluginTest {
         Class<?> type = result.loadClass("example.StaticBooleanFields");
 
         assertTrue(getStaticBoolean(type, "WITH_INIT_FINAL"));
-        assertFalse(getStaticBoolean(type, "WITHOUT_INIT_FINAL"));
+        assertTrue(getStaticBoolean(type, "WITHOUT_INIT_FINAL"));
         assertTrue(getStaticBoolean(type, "WITH_INIT_MUTABLE"));
-        assertFalse(getStaticBoolean(type, "WITHOUT_INIT_MUTABLE"));
+        assertTrue(getStaticBoolean(type, "WITHOUT_INIT_MUTABLE"));
     }
 
     @Test
@@ -560,7 +560,7 @@ class JavaRefPluginTest {
                 "public class MultipleStaticBlocks {",
                 "    static final boolean FLAG;",
                 "    static {",
-                "        System.out.println(\"first\");",
+                "        FLAG = true;",
                 "    }",
                 "    static {",
                 "        System.out.println(\"second\");",
@@ -572,7 +572,7 @@ class JavaRefPluginTest {
         CompilationResult result = compile(sources);
         Class<?> type = result.loadClass("example.MultipleStaticBlocks");
         assertNotNull(type);
-        assertFalse(getStaticBoolean(type, "FLAG"));
+        assertTrue(getStaticBoolean(type, "FLAG"));
     }
 
     @Test
@@ -602,8 +602,32 @@ class JavaRefPluginTest {
         CompilationResult result = compile(sources);
         Class<?> type = result.loadClass("example.TwoStaticBlocks");
         assertNotNull(type);
-        assertEquals(0, getStaticInt(type, "REQUIRED"));
-        assertEquals(0, getStaticInt(type, "MUTABLE"));
+        assertEquals(7, getStaticInt(type, "REQUIRED"));
+        assertEquals(123, getStaticInt(type, "MUTABLE"));
+    }
+
+    @Test
+    void preservesStaticInitializerPositionForBlankFinalRead() throws Exception {
+        Map<String, String> sources = new LinkedHashMap<>();
+        sources.put(
+            "example/StaticOrder.java",
+            joinLines(
+                "package example;",
+                "",
+                "public class StaticOrder {",
+                "    static final Object REQUIRED;",
+                "    static {",
+                "        REQUIRED = new Object();",
+                "    }",
+                "    static Object ALIAS = REQUIRED;",
+                "}"
+            )
+        );
+
+        CompilationResult result = compile(sources);
+        Class<?> type = result.loadClass("example.StaticOrder");
+        assertNotNull(type);
+        assertNotNull(getStaticObject(type, "ALIAS"));
     }
 
     private static boolean getStaticBoolean(Class<?> type, String fieldName) throws Exception {
@@ -616,6 +640,12 @@ class JavaRefPluginTest {
         java.lang.reflect.Field field = type.getDeclaredField(fieldName);
         field.setAccessible(true);
         return field.getInt(null);
+    }
+
+    private static Object getStaticObject(Class<?> type, String fieldName) throws Exception {
+        java.lang.reflect.Field field = type.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.get(null);
     }
 
 }

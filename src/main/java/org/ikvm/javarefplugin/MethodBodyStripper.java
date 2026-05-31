@@ -33,79 +33,10 @@ final class MethodBodyStripper extends TreeTranslator {
 
         super.visitClassDef(tree);
 
-        // Strip all original static initializers and synthesize a single minimal one when needed.
-        if (tree.defs != null && !inAnnotationType) {
-            List<JCTree.JCStatement> rewrittenAssignments = generateDefaultStaticFieldAssignments(tree);
-            ListBuffer<JCTree> rewrittenDefs = new ListBuffer<>();
-
-            for (JCTree def : tree.defs) {
-                if (def instanceof JCTree.JCBlock && ((((JCTree.JCBlock) def).flags & Flags.STATIC) != 0)) {
-                    continue;
-                }
-                rewrittenDefs.append(def);
-            }
-
-            if (!rewrittenAssignments.isEmpty()) {
-                rewrittenDefs.append(maker.Block(Flags.STATIC, rewrittenAssignments));
-            }
-
-            tree.defs = rewrittenDefs.toList();
-        }
-
         inAnnotationType = previousInAnnotationType;
         result = tree;
     }
 
-    private List<JCTree.JCStatement> generateDefaultStaticFieldAssignments(JCTree.JCClassDecl classTree) {
-        ListBuffer<JCTree.JCStatement> statements = new ListBuffer<>();
-
-        if (classTree.defs == null) {
-            return statements.toList();
-        }
-
-        // Assign defaults to static fields without initializers.
-        // Skip fields that have initializers - they are already assigned and shouldn't be reassigned.
-        for (JCTree def : classTree.defs) {
-            if (def instanceof JCTree.JCVariableDecl) {
-                JCTree.JCVariableDecl varDecl = (JCTree.JCVariableDecl) def;
-
-                boolean isStatic = (varDecl.mods.flags & Flags.STATIC) != 0;
-                if (!isStatic) {
-                    continue;
-                }
-
-                boolean hasInitializer = varDecl.init != null;
-                if (hasInitializer) {
-                    continue;
-                }
-
-                JCTree.JCExpression defaultValue = generateDefaultValue(varDecl.vartype);
-                JCTree.JCAssign assignment = maker.Assign(
-                    maker.Ident(varDecl.name),
-                    defaultValue
-                );
-                statements.append(maker.Exec(assignment));
-            }
-        }
-
-        return statements.toList();
-    }
-
-    private JCTree.JCExpression generateDefaultValue(JCTree.JCExpression typeExpr) {
-        // For simplicity: 0 for numeric types, false for boolean, null for everything else
-        String typeStr = typeExpr.toString();
-        if ("int".equals(typeStr) || "byte".equals(typeStr) || "short".equals(typeStr) || "long".equals(typeStr)
-            || "float".equals(typeStr) || "double".equals(typeStr)) {
-            return maker.Literal(TypeTag.INT, 0);
-        } else if ("boolean".equals(typeStr)) {
-            // javac expects boolean literals as numeric payload (0/1) for TypeTag.BOOLEAN
-            return maker.Literal(TypeTag.BOOLEAN, 0);
-        } else if ("char".equals(typeStr)) {
-            return maker.Literal(TypeTag.CHAR, 0);
-        }
-        // Reference type or unknown: null
-        return maker.Literal(TypeTag.BOT, null);
-    }
 
     @Override
     public void visitMethodDef(JCTree.JCMethodDecl tree) {
@@ -128,11 +59,6 @@ final class MethodBodyStripper extends TreeTranslator {
     private boolean isConstructor(JCTree.JCMethodDecl tree) {
         return tree.name == names.init;
     }
-
-    private boolean isClassInitializer(JCTree.JCMethodDecl tree) {
-        return tree.name == names.clinit;
-    }
-
 
     private List<JCTree.JCStatement> replacementStatements(JCTree.JCMethodDecl tree) {
         ListBuffer<JCTree.JCStatement> statements = new ListBuffer<>();
