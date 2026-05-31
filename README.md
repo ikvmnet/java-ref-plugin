@@ -20,9 +20,9 @@ The plugin rewrites method bodies to throw `NullPointerException` on invocation:
 
 - **Instance methods**: replaced with `throw null`.
 - **Constructors**: preserved `this()/super()` chaining, then `throw null`.
-- **Static initializers**: replaced with minimal field assignments (sets static fields to type-appropriate defaults: `0`, `false`, or `null`). This drastically reduces bytecode size while ensuring the class loads correctly.
+- **Static initializers**: preserved intact.
 - **Abstract/native methods**: bodies left unchanged (they have no bodies).
-- **Synthetic bridge methods**: rewritten like regular methods (bridges still exist as method symbols).
+- **Synthetic bridge methods**: not specifically handled; the plugin rewrites the concrete method bodies it sees during its `ENTER`-time traversal.
 
 ### Plugin arguments
 
