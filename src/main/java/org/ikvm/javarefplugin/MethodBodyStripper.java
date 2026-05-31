@@ -57,28 +57,23 @@ final class MethodBodyStripper extends TreeTranslator {
             return statements.toList();
         }
 
-        // Assign default values to static fields WITHOUT initializers:
-        // 1. static non-final fields without initializers
-        // 2. static final fields without initializers (must assign in static {} block)
-        // Do NOT assign to any static fields that already have initializers
+        // Assign defaults to static fields without initializers.
+        // Skip fields that have initializers - they are already assigned and shouldn't be reassigned.
         for (JCTree def : classTree.defs) {
             if (def instanceof JCTree.JCVariableDecl) {
                 JCTree.JCVariableDecl varDecl = (JCTree.JCVariableDecl) def;
                 boolean isStatic = (varDecl.mods.flags & Flags.STATIC) != 0;
 
-                // Only process static fields
                 if (!isStatic) {
                     continue;
                 }
 
                 boolean hasInitializer = varDecl.init != null;
 
-                // Skip any field that already has an initializer
                 if (hasInitializer) {
                     continue;
                 }
 
-                // Assign default to static fields without initializers
                 JCTree.JCExpression defaultValue = generateDefaultValue(varDecl.vartype);
                 JCTree.JCAssign assignment = maker.Assign(
                     maker.Ident(varDecl.name),
@@ -98,7 +93,8 @@ final class MethodBodyStripper extends TreeTranslator {
             || "float".equals(typeStr) || "double".equals(typeStr)) {
             return maker.Literal(TypeTag.INT, 0);
         } else if ("boolean".equals(typeStr)) {
-            return maker.Literal(TypeTag.BOOLEAN, Boolean.FALSE);
+            // javac expects boolean literals as numeric payload (0/1) for TypeTag.BOOLEAN
+            return maker.Literal(TypeTag.BOOLEAN, 0);
         } else if ("char".equals(typeStr)) {
             return maker.Literal(TypeTag.CHAR, 0);
         }

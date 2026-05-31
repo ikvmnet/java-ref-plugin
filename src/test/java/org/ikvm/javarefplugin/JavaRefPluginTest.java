@@ -1,6 +1,7 @@
 package org.ikvm.javarefplugin;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -479,6 +480,79 @@ class JavaRefPluginTest {
         InvocationTargetException mutableFailure =
             assertThrows(InvocationTargetException.class, () -> type.getMethod("getMutable").invoke(null));
         assertTrue(mutableFailure.getCause() instanceof NullPointerException);
+    }
+
+    @Test
+    void staticFieldsAllCombinations() throws Exception {
+        Map<String, String> sources = new LinkedHashMap<>();
+        sources.put(
+            "example/AllStaticFields.java",
+            joinLines(
+                "package example;",
+                "",
+                "public class AllStaticFields {",
+                "    // static final WITH initializer - should NOT be reassigned",
+                "    static final long WITH_INIT_FINAL = 42L;",
+                "",
+                "    // static final WITHOUT initializer - MUST be assigned",
+                "    static final String WITHOUT_INIT_FINAL;",
+                "",
+                "    // static non-final WITH initializer - should NOT be reassigned?",
+                "    static int WITH_INIT_MUTABLE = 100;",
+                "",
+                "    // static non-final WITHOUT initializer - should be assigned to 0",
+                "    static int WITHOUT_INIT_MUTABLE;",
+                "",
+                "    static {",
+                "        WITHOUT_INIT_FINAL = \"initialized\";",
+                "        WITHOUT_INIT_MUTABLE = 200;",
+                "    }",
+                "",
+                "    public static void dummy() { }",
+                "}"
+            )
+        );
+
+        // Just verify the plugin can compile this without errors
+        CompilationResult result = compile(sources);
+        assertNotNull(result.loadClass("example.AllStaticFields"));
+    }
+
+    @Test
+    void staticBooleanFieldsCombinationsAreHandled() throws Exception {
+        Map<String, String> sources = new LinkedHashMap<>();
+        sources.put(
+            "example/StaticBooleanFields.java",
+            joinLines(
+                "package example;",
+                "",
+                "public class StaticBooleanFields {",
+                "    static final boolean WITH_INIT_FINAL = true;",
+                "    static final boolean WITHOUT_INIT_FINAL;",
+                "    static boolean WITH_INIT_MUTABLE = true;",
+                "    static boolean WITHOUT_INIT_MUTABLE;",
+                "",
+                "    static {",
+                "        WITHOUT_INIT_FINAL = true;",
+                "        WITHOUT_INIT_MUTABLE = true;",
+                "    }",
+                "}"
+            )
+        );
+
+        CompilationResult result = compile(sources);
+        Class<?> type = result.loadClass("example.StaticBooleanFields");
+
+        assertTrue(getStaticBoolean(type, "WITH_INIT_FINAL"));
+        assertFalse(getStaticBoolean(type, "WITHOUT_INIT_FINAL"));
+        assertTrue(getStaticBoolean(type, "WITH_INIT_MUTABLE"));
+        assertFalse(getStaticBoolean(type, "WITHOUT_INIT_MUTABLE"));
+    }
+
+    private static boolean getStaticBoolean(Class<?> type, String fieldName) throws Exception {
+        java.lang.reflect.Field field = type.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.getBoolean(null);
     }
 
 }
