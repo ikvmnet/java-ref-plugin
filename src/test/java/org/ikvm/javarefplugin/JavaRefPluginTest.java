@@ -549,6 +549,32 @@ class JavaRefPluginTest {
         assertFalse(getStaticBoolean(type, "WITHOUT_INIT_MUTABLE"));
     }
 
+    @Test
+    void staticFinalWithoutInitializerWithMultipleStaticBlocksAssignedOnce() throws Exception {
+        Map<String, String> sources = new LinkedHashMap<>();
+        sources.put(
+            "example/MultipleStaticBlocks.java",
+            joinLines(
+                "package example;",
+                "",
+                "public class MultipleStaticBlocks {",
+                "    static final boolean FLAG;",
+                "    static {",
+                "        System.out.println(\"first\");",
+                "    }",
+                "    static {",
+                "        System.out.println(\"second\");",
+                "    }",
+                "}"
+            )
+        );
+
+        CompilationResult result = compile(sources);
+        Class<?> type = result.loadClass("example.MultipleStaticBlocks");
+        assertNotNull(type);
+        assertFalse(getStaticBoolean(type, "FLAG"));
+    }
+
     private static boolean getStaticBoolean(Class<?> type, String fieldName) throws Exception {
         java.lang.reflect.Field field = type.getDeclaredField(fieldName);
         field.setAccessible(true);

@@ -33,17 +33,23 @@ final class MethodBodyStripper extends TreeTranslator {
 
         super.visitClassDef(tree);
 
-        // Rewrite static initializers to set fields to default values
+        // Strip all original static initializers and synthesize a single minimal one when needed.
         if (tree.defs != null && !inAnnotationType) {
+            List<JCTree.JCStatement> rewrittenAssignments = generateDefaultStaticFieldAssignments(tree);
+            ListBuffer<JCTree> rewrittenDefs = new ListBuffer<>();
+
             for (JCTree def : tree.defs) {
-                if (def instanceof JCTree.JCBlock) {
-                    JCTree.JCBlock block = (JCTree.JCBlock) def;
-                    if ((block.flags & Flags.STATIC) != 0) {
-                        // Replace with minimal field assignments
-                        block.stats = generateDefaultStaticFieldAssignments(tree);
-                    }
+                if (def instanceof JCTree.JCBlock && ((((JCTree.JCBlock) def).flags & Flags.STATIC) != 0)) {
+                    continue;
                 }
+                rewrittenDefs.append(def);
             }
+
+            if (!rewrittenAssignments.isEmpty()) {
+                rewrittenDefs.append(maker.Block(Flags.STATIC, rewrittenAssignments));
+            }
+
+            tree.defs = rewrittenDefs.toList();
         }
 
         inAnnotationType = previousInAnnotationType;
@@ -62,14 +68,13 @@ final class MethodBodyStripper extends TreeTranslator {
         for (JCTree def : classTree.defs) {
             if (def instanceof JCTree.JCVariableDecl) {
                 JCTree.JCVariableDecl varDecl = (JCTree.JCVariableDecl) def;
-                boolean isStatic = (varDecl.mods.flags & Flags.STATIC) != 0;
 
+                boolean isStatic = (varDecl.mods.flags & Flags.STATIC) != 0;
                 if (!isStatic) {
                     continue;
                 }
 
                 boolean hasInitializer = varDecl.init != null;
-
                 if (hasInitializer) {
                     continue;
                 }
