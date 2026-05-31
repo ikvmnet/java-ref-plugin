@@ -413,6 +413,7 @@ class JavaRefPluginTest {
         }
     }
 
+
     private static final class CompilationResult {
         private final Path classesDirectory;
         private final URLClassLoader classLoader;

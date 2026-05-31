@@ -50,24 +50,13 @@ final class MethodBodyStripper extends TreeTranslator {
 
     private boolean shouldKeepBody(JCTree.JCMethodDecl tree) {
         long flags = tree.mods.flags;
-        if ((flags & (Flags.ABSTRACT | Flags.NATIVE)) != 0) {
-            return true;
-        }
-
-        return (flags & Flags.SYNTHETIC) != 0 && !isInitializer(tree);
+        return (flags & (Flags.ABSTRACT | Flags.NATIVE)) != 0;
     }
 
     private boolean isConstructor(JCTree.JCMethodDecl tree) {
         return tree.name == names.init;
     }
 
-    private boolean isClassInitializer(JCTree.JCMethodDecl tree) {
-        return tree.name == names.clinit;
-    }
-
-    private boolean isInitializer(JCTree.JCMethodDecl tree) {
-        return isConstructor(tree) || isClassInitializer(tree);
-    }
 
     private List<JCTree.JCStatement> replacementStatements(JCTree.JCMethodDecl tree) {
         ListBuffer<JCTree.JCStatement> statements = new ListBuffer<>();
