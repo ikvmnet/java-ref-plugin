@@ -5,9 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
@@ -286,6 +288,30 @@ class JavaRefPluginTest {
     }
 
     @Test
+    void logsIgnoredClasses() throws Exception {
+        Map<String, String> sources = new LinkedHashMap<>();
+        sources.put(
+            "example/keep/Kept.java",
+            joinLines(
+                "package example.keep;",
+                "",
+                "public class Kept {",
+                "    public static String value() {",
+                "        return \"kept\";",
+                "    }",
+                "}"
+            )
+        );
+
+        CompilationInvocation invocation = compileCapturingOutput(sources, "ignorePackage=example.keep");
+
+        assertTrue(invocation.output.contains("JavaRef: ignoring example.keep.Kept due to ignorePackage=example.keep"));
+
+        Class<?> keptClass = invocation.result.loadClass("example.keep.Kept");
+        assertEquals("kept", keptClass.getMethod("value").invoke(null));
+    }
+
+    @Test
     void pluginClassesTargetJava8Bytecode() throws Exception {
         assertEquals(52, classFileMajorVersion(JavaRefPlugin.class));
         assertEquals(52, classFileMajorVersion(MethodBodyStripper.class));
@@ -297,6 +323,18 @@ class JavaRefPluginTest {
 
     private CompilationResult compile(Map<String, String> sources, String... pluginArgs) throws IOException {
         return compileImpl(sources, "", true, pluginArgs);
+    }
+
+    private CompilationInvocation compileCapturingOutput(Map<String, String> sources, String... pluginArgs) throws IOException {
+        PrintStream originalErr = System.err;
+        ByteArrayOutputStream capturedErr = new ByteArrayOutputStream();
+        try {
+            System.setErr(new PrintStream(capturedErr, true, StandardCharsets.UTF_8.name()));
+            CompilationResult result = compileImpl(sources, "", true, pluginArgs);
+            return new CompilationInvocation(result, capturedErr.toString(StandardCharsets.UTF_8.name()));
+        } finally {
+            System.setErr(originalErr);
+        }
     }
 
     private CompilationResult compileImpl(Map<String, String> sources, String extraClasspath, boolean withPlugin, String... pluginArgs) throws IOException {
@@ -387,6 +425,16 @@ class JavaRefPluginTest {
 
         private Class<?> loadClass(String name) throws Exception {
             return Class.forName(name, true, classLoader);
+        }
+    }
+
+    private static final class CompilationInvocation {
+        private final CompilationResult result;
+        private final String output;
+
+        private CompilationInvocation(CompilationResult result, String output) {
+            this.result = result;
+            this.output = output;
         }
     }
 }

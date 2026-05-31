@@ -16,7 +16,7 @@ org.ikvm:java-ref-plugin
 
 ### Plugin arguments
 
-- `ignorePackage=<packageName>`: skips rewriting for classes in the package and its subpackages. Repeat the argument to ignore multiple package roots.
+- `ignorePackage=<packageName>`: skips rewriting for classes in the package and its subpackages. Repeat the argument to ignore multiple package roots. Ignored classes are logged as `javac` notices during compilation.
 
 ## Building
 
