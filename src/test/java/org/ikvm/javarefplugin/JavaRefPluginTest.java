@@ -575,10 +575,47 @@ class JavaRefPluginTest {
         assertFalse(getStaticBoolean(type, "FLAG"));
     }
 
+    @Test
+    void stripsClassWithTwoStaticBlocks() throws Exception {
+        Map<String, String> sources = new LinkedHashMap<>();
+        sources.put(
+            "example/TwoStaticBlocks.java",
+            joinLines(
+                "package example;",
+                "",
+                "public class TwoStaticBlocks {",
+                "    static final int REQUIRED;",
+                "    static int MUTABLE;",
+                "",
+                "    static {",
+                "        MUTABLE = 123;",
+                "    }",
+                "",
+                "    static {",
+                "        REQUIRED = 7;",
+                "    }",
+                "}",
+                ""
+            )
+        );
+
+        CompilationResult result = compile(sources);
+        Class<?> type = result.loadClass("example.TwoStaticBlocks");
+        assertNotNull(type);
+        assertEquals(0, getStaticInt(type, "REQUIRED"));
+        assertEquals(0, getStaticInt(type, "MUTABLE"));
+    }
+
     private static boolean getStaticBoolean(Class<?> type, String fieldName) throws Exception {
         java.lang.reflect.Field field = type.getDeclaredField(fieldName);
         field.setAccessible(true);
         return field.getBoolean(null);
+    }
+
+    private static int getStaticInt(Class<?> type, String fieldName) throws Exception {
+        java.lang.reflect.Field field = type.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.getInt(null);
     }
 
 }
