@@ -37,7 +37,6 @@ final class MethodBodyStripper extends TreeTranslator {
         result = tree;
     }
 
-
     @Override
     public void visitMethodDef(JCTree.JCMethodDecl tree) {
         super.visitMethodDef(tree);
