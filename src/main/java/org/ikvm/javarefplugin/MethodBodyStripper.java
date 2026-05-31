@@ -57,10 +57,10 @@ final class MethodBodyStripper extends TreeTranslator {
             return statements.toList();
         }
 
-        // Assign default values to:
-        // 1. All static non-final fields
-        // 2. static final fields WITHOUT field initializers (must assign in static {} to avoid "not initialized" error)
-        // Do NOT assign to: static final fields WITH field initializers (they already have values)
+        // Assign default values to static fields WITHOUT initializers:
+        // 1. static non-final fields without initializers
+        // 2. static final fields without initializers (must assign in static {} block)
+        // Do NOT assign to any static fields that already have initializers
         for (JCTree def : classTree.defs) {
             if (def instanceof JCTree.JCVariableDecl) {
                 JCTree.JCVariableDecl varDecl = (JCTree.JCVariableDecl) def;
@@ -71,15 +71,14 @@ final class MethodBodyStripper extends TreeTranslator {
                     continue;
                 }
 
-                boolean isFinal = (varDecl.mods.flags & Flags.FINAL) != 0;
                 boolean hasInitializer = varDecl.init != null;
 
-                // Skip final fields that already have initializers
-                if (isFinal && hasInitializer) {
+                // Skip any field that already has an initializer
+                if (hasInitializer) {
                     continue;
                 }
 
-                // Assign all other static fields
+                // Assign default to static fields without initializers
                 JCTree.JCExpression defaultValue = generateDefaultValue(varDecl.vartype);
                 JCTree.JCAssign assignment = maker.Assign(
                     maker.Ident(varDecl.name),
