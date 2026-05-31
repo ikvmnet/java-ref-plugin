@@ -1,6 +1,7 @@
 package org.ikvm.javarefplugin;
 
 import com.sun.tools.javac.code.Flags;
+import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.tree.TreeTranslator;
@@ -11,8 +12,6 @@ import com.sun.tools.javac.util.Name;
 import com.sun.tools.javac.util.Names;
 
 final class MethodBodyStripper extends TreeTranslator {
-
-    private static final String STRIPPED_MESSAGE = "Method body stripped from reference-only artifact.";
 
     private final TreeMaker maker;
     private final Names names;
@@ -55,11 +54,19 @@ final class MethodBodyStripper extends TreeTranslator {
             return true;
         }
 
-        return (flags & Flags.SYNTHETIC) != 0 && !isConstructor(tree);
+        return (flags & Flags.SYNTHETIC) != 0 && !isInitializer(tree);
     }
 
     private boolean isConstructor(JCTree.JCMethodDecl tree) {
         return tree.name == names.init;
+    }
+
+    private boolean isClassInitializer(JCTree.JCMethodDecl tree) {
+        return tree.name == names.clinit;
+    }
+
+    private boolean isInitializer(JCTree.JCMethodDecl tree) {
+        return isConstructor(tree) || isClassInitializer(tree);
     }
 
     private List<JCTree.JCStatement> replacementStatements(JCTree.JCMethodDecl tree) {
@@ -73,15 +80,7 @@ final class MethodBodyStripper extends TreeTranslator {
         }
 
         statements.append(
-            maker.Throw(
-                maker.NewClass(
-                    null,
-                    List.nil(),
-                    unsupportedOperationExceptionType(),
-                    List.of(maker.Literal(STRIPPED_MESSAGE)),
-                    null
-                )
-            )
+            maker.Throw(maker.Literal(TypeTag.BOT, null))
         );
 
         return statements.toList();
@@ -117,13 +116,5 @@ final class MethodBodyStripper extends TreeTranslator {
         return null;
     }
 
-    private JCTree.JCExpression unsupportedOperationExceptionType() {
-        String[] elements = "java.lang.UnsupportedOperationException".split("\\.");
-        JCTree.JCExpression expression = maker.Ident(names.fromString(elements[0]));
-        for (int i = 1; i < elements.length; i++) {
-            expression = maker.Select(expression, names.fromString(elements[i]));
-        }
-        return expression;
-    }
 }
 

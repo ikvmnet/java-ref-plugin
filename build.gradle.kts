@@ -14,6 +14,10 @@ val java8Compiler = javaToolchains.compilerFor {
     languageVersion = JavaLanguageVersion.of(8)
 }
 
+val java8Launcher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(8)
+}
+
 val java8ToolsJar = files(java8Compiler.map { it.metadata.installationPath.file("lib/tools.jar") })
 
 dependencies {
@@ -45,6 +49,7 @@ tasks.named<JavaCompile>("compileTestJava") {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    javaLauncher = java8Launcher
     testLogging {
         exceptionFormat = TestExceptionFormat.FULL
     }

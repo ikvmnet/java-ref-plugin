@@ -31,8 +31,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 class JavaRefPluginTest {
 
-    private static final String STRIPPED_MESSAGE = "Method body stripped from reference-only artifact.";
-
     @TempDir
     Path tempDir;
 
@@ -67,13 +65,11 @@ class JavaRefPluginTest {
 
         InvocationTargetException staticFailure =
             assertThrows(InvocationTargetException.class, () -> sampleClass.getMethod("greeting").invoke(null));
-        assertTrue(staticFailure.getCause() instanceof UnsupportedOperationException);
-        assertEquals(STRIPPED_MESSAGE, staticFailure.getCause().getMessage());
+        assertTrue(staticFailure.getCause() instanceof NullPointerException);
 
         InvocationTargetException constructorFailure =
             assertThrows(InvocationTargetException.class, () -> sampleClass.getConstructor().newInstance());
-        assertTrue(constructorFailure.getCause() instanceof UnsupportedOperationException);
-        assertEquals(STRIPPED_MESSAGE, constructorFailure.getCause().getMessage());
+        assertTrue(constructorFailure.getCause() instanceof NullPointerException);
     }
 
     @Test
@@ -109,8 +105,7 @@ class JavaRefPluginTest {
         Class<?> childClass = result.loadClass("example.Child");
         InvocationTargetException constructorFailure =
             assertThrows(InvocationTargetException.class, () -> childClass.getConstructor().newInstance());
-        assertTrue(constructorFailure.getCause() instanceof UnsupportedOperationException);
-        assertEquals(STRIPPED_MESSAGE, constructorFailure.getCause().getMessage());
+        assertTrue(constructorFailure.getCause() instanceof NullPointerException);
     }
 
     @Test
@@ -161,16 +156,14 @@ class JavaRefPluginTest {
         // Static method should throw
         InvocationTargetException staticFailure =
             assertThrows(InvocationTargetException.class, () -> interfaceClass.getMethod("helper").invoke(null));
-        assertTrue(staticFailure.getCause() instanceof UnsupportedOperationException);
-        assertEquals(STRIPPED_MESSAGE, staticFailure.getCause().getMessage());
+        assertTrue(staticFailure.getCause() instanceof NullPointerException);
 
         // Default method should throw (dispatches to stripped default from the interface)
         Object instance = implementationClass.getConstructor().newInstance();
         Method defaultMethod = implementationClass.getMethod("value");
         InvocationTargetException defaultFailure =
             assertThrows(InvocationTargetException.class, () -> defaultMethod.invoke(instance));
-        assertTrue(defaultFailure.getCause() instanceof UnsupportedOperationException);
-        assertEquals(STRIPPED_MESSAGE, defaultFailure.getCause().getMessage());
+        assertTrue(defaultFailure.getCause() instanceof NullPointerException);
     }
 
     @Test
@@ -192,8 +185,104 @@ class JavaRefPluginTest {
         Class<?> type = result.loadClass("example.ImplicitConstructor");
         InvocationTargetException constructorFailure =
             assertThrows(InvocationTargetException.class, () -> type.getConstructor().newInstance());
-        assertTrue(constructorFailure.getCause() instanceof UnsupportedOperationException);
-        assertEquals(STRIPPED_MESSAGE, constructorFailure.getCause().getMessage());
+        assertTrue(constructorFailure.getCause() instanceof NullPointerException);
+    }
+
+    @Test
+    void ignoresConfiguredPackage() throws Exception {
+        Map<String, String> sources = new LinkedHashMap<>();
+        sources.put(
+            "example/keep/Kept.java",
+            joinLines(
+                "package example.keep;",
+                "",
+                "public class Kept {",
+                "    public static String value() {",
+                "        return \"kept\";",
+                "    }",
+                "}"
+            )
+        );
+        sources.put(
+            "example/strip/Stripped.java",
+            joinLines(
+                "package example.strip;",
+                "",
+                "public class Stripped {",
+                "    public static String value() {",
+                "        return \"stripped\";",
+                "    }",
+                "}"
+            )
+        );
+
+        CompilationResult result = compile(sources, "ignorePackage=example.keep");
+
+        Class<?> keptClass = result.loadClass("example.keep.Kept");
+        assertEquals("kept", keptClass.getMethod("value").invoke(null));
+
+        Class<?> strippedClass = result.loadClass("example.strip.Stripped");
+        InvocationTargetException strippedFailure =
+            assertThrows(InvocationTargetException.class, () -> strippedClass.getMethod("value").invoke(null));
+        assertTrue(strippedFailure.getCause() instanceof NullPointerException);
+    }
+
+    @Test
+    void ignoresMultipleConfiguredPackages() throws Exception {
+        Map<String, String> sources = new LinkedHashMap<>();
+        sources.put(
+            "example/keep/one/KeptOne.java",
+            joinLines(
+                "package example.keep.one;",
+                "",
+                "public class KeptOne {",
+                "    public static String value() {",
+                "        return \"one\";",
+                "    }",
+                "}"
+            )
+        );
+        sources.put(
+            "example/keep/two/KeptTwo.java",
+            joinLines(
+                "package example.keep.two;",
+                "",
+                "public class KeptTwo {",
+                "    public static String value() {",
+                "        return \"two\";",
+                "    }",
+                "}"
+            )
+        );
+        sources.put(
+            "example/strip/Stripped.java",
+            joinLines(
+                "package example.strip;",
+                "",
+                "public class Stripped {",
+                "    public static String value() {",
+                "        return \"strip\";",
+                "    }",
+                "}"
+            )
+        );
+
+        CompilationResult result = compile(
+            sources,
+            "ignorePackage=example.keep.one",
+            "ignorePackage=example.keep.two"
+        );
+
+        Class<?> keptOneClass = result.loadClass("example.keep.one.KeptOne");
+        assertEquals("one", keptOneClass.getMethod("value").invoke(null));
+
+        Class<?> keptTwoClass = result.loadClass("example.keep.two.KeptTwo");
+        assertEquals("two", keptTwoClass.getMethod("value").invoke(null));
+
+        Class<?> strippedClass = result.loadClass("example.strip.Stripped");
+        InvocationTargetException strippedFailure =
+            assertThrows(InvocationTargetException.class, () -> strippedClass.getMethod("value").invoke(null));
+        assertTrue(strippedFailure.getCause() instanceof NullPointerException);
     }
 
     @Test
@@ -206,7 +295,11 @@ class JavaRefPluginTest {
         return compileImpl(sources, "", true);
     }
 
-    private CompilationResult compileImpl(Map<String, String> sources, String extraClasspath, boolean withPlugin) throws IOException {
+    private CompilationResult compile(Map<String, String> sources, String... pluginArgs) throws IOException {
+        return compileImpl(sources, "", true, pluginArgs);
+    }
+
+    private CompilationResult compileImpl(Map<String, String> sources, String extraClasspath, boolean withPlugin, String... pluginArgs) throws IOException {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
         Path sourceDirectory = Files.createDirectories(tempDir.resolve("src-" + System.nanoTime()));
@@ -234,7 +327,7 @@ class JavaRefPluginTest {
             options.add("-d");
             options.add(classesDirectory.toString());
             if (withPlugin) {
-                options.add("-Xplugin:" + JavaRefPlugin.NAME);
+                options.add(pluginOption(pluginArgs));
             }
             Boolean success = compiler.getTask(null, fileManager, diagnostics, options, null, units).call();
 
@@ -245,6 +338,14 @@ class JavaRefPluginTest {
         }
 
         return new CompilationResult(classesDirectory);
+    }
+
+    private static String pluginOption(String... pluginArgs) {
+        if (pluginArgs == null || pluginArgs.length == 0) {
+            return "-Xplugin:" + JavaRefPlugin.NAME;
+        }
+
+        return "-Xplugin:" + JavaRefPlugin.NAME + " " + String.join(" ", pluginArgs);
     }
 
     private static String formatDiagnostic(Diagnostic<? extends JavaFileObject> diagnostic) {
