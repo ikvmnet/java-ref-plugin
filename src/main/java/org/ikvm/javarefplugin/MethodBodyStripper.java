@@ -57,20 +57,24 @@ final class MethodBodyStripper extends TreeTranslator {
             return statements.toList();
         }
 
-        // Collect all static fields that can be safely reassigned
-        // (skip final fields that have an initializer - they have compile-time constant values)
+        // Assign default values to:
+        // 1. All static non-final fields
+        // 2. static final fields WITHOUT field initializers (must assign in static {} to avoid "not initialized" error)
+        // Do NOT assign to: static final fields WITH field initializers (they already have values)
         for (JCTree def : classTree.defs) {
             if (def instanceof JCTree.JCVariableDecl) {
                 JCTree.JCVariableDecl varDecl = (JCTree.JCVariableDecl) def;
-                if ((varDecl.mods.flags & Flags.STATIC) != 0) {
-                    // Skip if final AND has an initializer (compile-time constant)
-                    boolean isFinal = (varDecl.mods.flags & Flags.FINAL) != 0;
-                    boolean hasInitializer = varDecl.init != null;
-                    if (isFinal && hasInitializer) {
-                        continue;  // Skip final fields with initializers
-                    }
+                boolean isStatic = (varDecl.mods.flags & Flags.STATIC) != 0;
+                boolean isFinal = (varDecl.mods.flags & Flags.FINAL) != 0;
+                boolean hasInitializer = varDecl.init != null;
 
-                    // Generate assignment: field = defaultValue;
+                // Skip final fields that already have initializers
+                if (isFinal && hasInitializer) {
+                    continue;
+                }
+
+                // Assign all other static fields
+                if (isStatic) {
                     JCTree.JCExpression defaultValue = generateDefaultValue(varDecl.vartype);
                     JCTree.JCAssign assignment = maker.Assign(
                         maker.Ident(varDecl.name),
