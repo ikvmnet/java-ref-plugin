@@ -438,5 +438,47 @@ class JavaRefPluginTest {
             this.output = output;
         }
     }
-}
 
+    @Test
+    void staticInitializerOptimizationHandlesAllFieldTypes() throws Exception {
+        Map<String, String> sources = new LinkedHashMap<>();
+        sources.put(
+            "example/StaticFieldTypes.java",
+            joinLines(
+                "package example;",
+                "",
+                "public class StaticFieldTypes {",
+                "    static final long CONSTANT = 42L;",
+                "    static final String uninit;",
+                "    static int mutable;",
+                "    static {",
+                "        uninit = \"initialized\";",
+                "        mutable = 100;",
+                "    }",
+                "    public static long getConstant() { return CONSTANT; }",
+                "    public static String getUninit() { return uninit; }",
+                "    public static int getMutable() { return mutable; }",
+                "}"
+            )
+        );
+
+        // Just verify the plugin can compile this without errors
+        // (the key test is that final fields with initializers don't get reassigned)
+        CompilationResult result = compile(sources);
+        Class<?> type = result.loadClass("example.StaticFieldTypes");
+
+        // All methods should be stripped and throw NullPointerException
+        InvocationTargetException constantFailure =
+            assertThrows(InvocationTargetException.class, () -> type.getMethod("getConstant").invoke(null));
+        assertTrue(constantFailure.getCause() instanceof NullPointerException);
+
+        InvocationTargetException uninitFailure =
+            assertThrows(InvocationTargetException.class, () -> type.getMethod("getUninit").invoke(null));
+        assertTrue(uninitFailure.getCause() instanceof NullPointerException);
+
+        InvocationTargetException mutableFailure =
+            assertThrows(InvocationTargetException.class, () -> type.getMethod("getMutable").invoke(null));
+        assertTrue(mutableFailure.getCause() instanceof NullPointerException);
+    }
+
+}

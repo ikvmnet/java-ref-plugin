@@ -57,11 +57,19 @@ final class MethodBodyStripper extends TreeTranslator {
             return statements.toList();
         }
 
-        // Collect all static fields
+        // Collect all static fields that can be safely reassigned
+        // (skip final fields that have an initializer - they have compile-time constant values)
         for (JCTree def : classTree.defs) {
             if (def instanceof JCTree.JCVariableDecl) {
                 JCTree.JCVariableDecl varDecl = (JCTree.JCVariableDecl) def;
                 if ((varDecl.mods.flags & Flags.STATIC) != 0) {
+                    // Skip if final AND has an initializer (compile-time constant)
+                    boolean isFinal = (varDecl.mods.flags & Flags.FINAL) != 0;
+                    boolean hasInitializer = varDecl.init != null;
+                    if (isFinal && hasInitializer) {
+                        continue;  // Skip final fields with initializers
+                    }
+
                     // Generate assignment: field = defaultValue;
                     JCTree.JCExpression defaultValue = generateDefaultValue(varDecl.vartype);
                     JCTree.JCAssign assignment = maker.Assign(
